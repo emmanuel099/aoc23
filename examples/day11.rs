@@ -1,7 +1,6 @@
 use anyhow::Result;
 use aoc23::read_lines;
 use itertools::Itertools;
-use std::collections::HashSet;
 
 trait AbsDiff<T> {
     type Output;
@@ -33,14 +32,16 @@ impl Position {
     }
 }
 
-fn find_galaxies(space: &[Vec<bool>]) -> Vec<Position> {
+fn find_galaxies(space: &[Vec<bool>], distances: &[Vec<usize>]) -> Vec<Position> {
     space
         .iter()
         .enumerate()
         .flat_map(|(y, row)| {
             row.iter().enumerate().filter_map(move |(x, is_galaxy)| {
                 if *is_galaxy {
-                    Some(Position { x, y })
+                    let h = distances[y].iter().take(x).sum();
+                    let v = distances.iter().map(|row| row[x]).take(y).sum();
+                    Some(Position { x: h, y: v })
                 } else {
                     None
                 }
@@ -49,19 +50,23 @@ fn find_galaxies(space: &[Vec<bool>]) -> Vec<Position> {
         .collect()
 }
 
-fn expand_space(mut space: Vec<Vec<bool>>, factor: usize) -> Vec<Vec<bool>> {
+fn expand_space(
+    space: &[Vec<bool>],
+    mut distances: Vec<Vec<usize>>,
+    factor: usize,
+) -> Vec<Vec<usize>> {
     let width = space[0].len();
     let height = space.len();
-    for y in (0..height).rev() {
+
+    for y in 0..height {
         if space[y].iter().any(|&is_galaxy| is_galaxy) {
             continue;
         }
 
-        space.insert(y, vec![false; width]);
+        distances[y] = vec![factor; width];
     }
 
-    let height = space.len();
-    'row: for x in (0..width).rev() {
+    'row: for x in 0..width {
         for y in 0..height {
             if space[y][x] {
                 continue 'row;
@@ -69,11 +74,11 @@ fn expand_space(mut space: Vec<Vec<bool>>, factor: usize) -> Vec<Vec<bool>> {
         }
 
         for y in 0..height {
-            space[y].insert(x, false);
+            distances[y][x] = factor;
         }
     }
 
-    space
+    distances
 }
 
 fn main() -> Result<()> {
@@ -84,27 +89,25 @@ fn main() -> Result<()> {
         .map(|line| line.chars().map(|c| c == '#').collect_vec())
         .collect_vec();
 
-    let space = expand_space(space, 1);
+    let orig_distances = vec![vec![1; space[0].len()]; space.len()];
 
-    /*for row in &space {
-        for &is_galaxy in row {
-            if is_galaxy {
-                print!("#")
-            } else {
-                print!(".")
-            }
-        }
-        println!("");
-    }
-    println!("");*/
-
-    let galaxies = find_galaxies(&space);
+    let distances_2 = expand_space(&space, orig_distances.clone(), 2);
+    let galaxies = find_galaxies(&space, &distances_2);
     let sum_of_lengths: usize = galaxies
         .iter()
         .tuple_combinations()
         .map(|(p1, p2)| p1.manhattan_distance(p2))
         .sum();
     println!("Part I: {sum_of_lengths}");
+
+    let distances_1000000 = expand_space(&space, orig_distances.clone(), 1000000);
+    let galaxies = find_galaxies(&space, &distances_1000000);
+    let sum_of_lengths: usize = galaxies
+        .iter()
+        .tuple_combinations()
+        .map(|(p1, p2)| p1.manhattan_distance(p2))
+        .sum();
+    println!("Part II: {sum_of_lengths}");
 
     Ok(())
 }
